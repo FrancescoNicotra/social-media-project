@@ -1,0 +1,11 @@
+#exclude .env file
+.env
+
+.DS_Store
+
+__pycache__/*
+
+#ignore everything inside the videos, audio, and transcriptions folders
+videos/*
+audio/*
+transcriptions/*
