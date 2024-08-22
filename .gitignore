@@ -9,3 +9,7 @@ __pycache__/*
 videos/*
 audio/*
 transcriptions/*
+
+.ipynb_checkpoints/
+
+*.csv

@@ -9,11 +9,13 @@ import numpy as np
 import time
 import csv
 import pandas as pd
+import multiprocessing
 
 from ffpyplayer.player import MediaPlayer
 from readVideosTitle import leggi_titoli_video
 from cv2 import dnn
 from math import ceil
+from transcribe import transcribe_audio
 
 image_mean = np.array([127, 127, 127])
 image_std = 128.0
@@ -21,9 +23,9 @@ iou_threshold = 0.3
 center_variance = 0.1
 size_variance = 0.2
 min_boxes = [
-	[10.0, 16.0, 24.0], 
-	[32.0, 48.0], 
-	[64.0, 96.0], 
+	[10.0, 16.0, 24.0],
+	[32.0, 48.0],
+	[64.0, 96.0],
 	[128.0, 192.0, 256.0]
 ]
 strides = [8.0, 16.0, 32.0, 64.0]
@@ -172,7 +174,7 @@ def get_audio_frame(player):
 			img, t = audio_frame
 		return val
 
-def FER_live_cam(video_name: list[str]):
+def FER_live_cam(video_name: str):
 	emotion_dict = {
 		0: 'neutral',
 		1: 'happiness',
@@ -182,122 +184,131 @@ def FER_live_cam(video_name: list[str]):
 		5: 'disgust',
 		6: 'fear'
 	}
-	for titoli in video_name:
+	#creare un lettore multimediale per il video
+	player = MediaPlayer('./videos/' + video_name + '.mp4')
 
-		#creare un lettore multimediale per il video
-		player = MediaPlayer('./videos/' + titoli + '.mp4')
+	cap = cv2.VideoCapture('./videos/' + video_name + '.mp4')
+	# cap = cv2.VideoCapture(0)
 
-		cap = cv2.VideoCapture('./videos/' + titoli + '.mp4')
-		# cap = cv2.VideoCapture(0)
+	frame_width = int(cap.get(3))
+	frame_height = int(cap.get(4))
+	size = (frame_width, frame_height)
+	result = cv2.VideoWriter('infer2-test.avi',
+						cv2.VideoWriter_fourcc(*'MJPG'),
+						10, size)
 
-		frame_width = int(cap.get(3))
-		frame_height = int(cap.get(4))
-		size = (frame_width, frame_height)
-		result = cv2.VideoWriter('infer2-test.avi',
-							cv2.VideoWriter_fourcc(*'MJPG'),
-							10, size)
+	# Read ONNX model
+	model = 'onnx_model.onnx'
+	model = cv2.dnn.readNetFromONNX('emotion-ferplus-8.onnx')
 
-		# Read ONNX model
-		model = 'onnx_model.onnx'
-		model = cv2.dnn.readNetFromONNX('emotion-ferplus-8.onnx')
+	# Read the Caffe face detector.
+	model_path = 'RFB-320/RFB-320.caffemodel'
+	proto_path = 'RFB-320/RFB-320.prototxt'
+	net = dnn.readNetFromCaffe(proto_path, model_path)
+	input_size = [320, 240]
+	width = input_size[0]
+	height = input_size[1]
+	priors = define_img_size(input_size)
 
-		# Read the Caffe face detector.
-		model_path = 'RFB-320/RFB-320.caffemodel'
-		proto_path = 'RFB-320/RFB-320.prototxt'
-		net = dnn.readNetFromCaffe(proto_path, model_path)
-		input_size = [320, 240]
-		width = input_size[0]
-		height = input_size[1]
-		priors = define_img_size(input_size)
+	# Open CSV file for appending
+	df = pd.DataFrame(columns=['Emotion', 'Timestamp'])
+	csv_file_title = 'emotions_' + video_name.replace(' ', '_') + '.csv'
+	df.to_csv(csv_file_title, index=False)
+	csv_file = open(csv_file_title, mode='a', newline='')
+	csv_writer = csv.writer(csv_file)
 
-		# Open CSV file for appending
-		df = pd.DataFrame(columns=['Emotion', 'Timestamp'])
-		csv_file_title = 'emotions_' + titoli.replace(' ', '_') + '.csv'
-		df.to_csv(csv_file_title, index=False)
-		csv_file = open(csv_file_title, mode='a', newline='')
-		csv_writer = csv.writer(csv_file)
-
-		while cap.isOpened():
-			ret, frame = cap.read()
-			if ret:
-				img_ori = frame
-				#print("frame size: ", frame.shape)
-				rect = cv2.resize(img_ori, (width, height))
-				rect = cv2.cvtColor(rect, cv2.COLOR_BGR2RGB)
-				net.setInput(dnn.blobFromImage(
-					rect, 1 / image_std, (width, height), 127)
+	while cap.isOpened():
+		ret, frame = cap.read()
+		if ret:
+			img_ori = frame
+			#print("frame size: ", frame.shape)
+			rect = cv2.resize(img_ori, (width, height))
+			rect = cv2.cvtColor(rect, cv2.COLOR_BGR2RGB)
+			net.setInput(dnn.blobFromImage(
+				rect, 1 / image_std, (width, height), 127)
+			)
+			start_time = time.time()
+			boxes, scores = net.forward(["boxes", "scores"])
+			boxes = np.expand_dims(np.reshape(boxes, (-1, 4)), axis=0)
+			scores = np.expand_dims(np.reshape(scores, (-1, 2)), axis=0)
+			boxes = convert_locations_to_boxes(
+				boxes, priors, center_variance, size_variance
+			)
+			boxes = center_form_to_corner_form(boxes)
+			boxes, labels, probs = predict(
+				img_ori.shape[1],
+				img_ori.shape[0],
+				scores,
+				boxes,
+				threshold
+			)
+			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			for (x1, y1, x2, y2) in boxes:
+				w = x2 - x1
+				h = y2 - y1
+				cv2.rectangle(frame, (x1,y1), (x2, y2), (255,0,0), 2)
+				resize_frame = cv2.resize(
+					gray[y1:y1 + h, x1:x1 + w], (64, 64)
 				)
-				start_time = time.time()
-				boxes, scores = net.forward(["boxes", "scores"])
-				boxes = np.expand_dims(np.reshape(boxes, (-1, 4)), axis=0)
-				scores = np.expand_dims(np.reshape(scores, (-1, 2)), axis=0)
-				boxes = convert_locations_to_boxes(
-					boxes, priors, center_variance, size_variance
+				resize_frame = resize_frame.reshape(1, 1, 64, 64)
+				model.setInput(resize_frame)
+				output = model.forward()
+				end_time = time.time()
+				fps = 1 / (end_time - start_time)
+				print(f"FPS: {fps:.1f}")
+				pred = emotion_dict[list(output[0]).index(max(output[0]))]
+				timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(end_time))
+
+				# Write to CSV
+				csv_writer.writerow([pred, timestamp])
+
+				cv2.rectangle(
+					img_ori,
+					(x1, y1),
+					(x2, y2),
+					(215, 5, 247),
+					2,
+					lineType=cv2.LINE_AA
 				)
-				boxes = center_form_to_corner_form(boxes)
-				boxes, labels, probs = predict(
-					img_ori.shape[1],
-					img_ori.shape[0],
-					scores,
-					boxes,
-					threshold
+				cv2.putText(
+					frame,
+					pred,
+					(x1, y1-10),
+					cv2.FONT_HERSHEY_SIMPLEX,
+					0.8,
+					(215, 5, 247),
+					2,
+					lineType=cv2.LINE_AA
 				)
-				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-				for (x1, y1, x2, y2) in boxes:
-					w = x2 - x1
-					h = y2 - y1
-					cv2.rectangle(frame, (x1,y1), (x2, y2), (255,0,0), 2)
-					resize_frame = cv2.resize(
-						gray[y1:y1 + h, x1:x1 + w], (64, 64)
-					)
-					resize_frame = resize_frame.reshape(1, 1, 64, 64)
-					model.setInput(resize_frame)
-					output = model.forward()
-					end_time = time.time()
-					fps = 1 / (end_time - start_time)
-					print(f"FPS: {fps:.1f}")
-					pred = emotion_dict[list(output[0]).index(max(output[0]))]
-					timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(end_time))
 
-					# Write to CSV
-					csv_writer.writerow([pred, timestamp])
+			result.write(frame)
 
-					cv2.rectangle(
-						img_ori,
-						(x1, y1),
-						(x2, y2),
-						(215, 5, 247),
-						2,
-						lineType=cv2.LINE_AA
-					)
-					cv2.putText(
-						frame,
-						pred,
-						(x1, y1-10),
-						cv2.FONT_HERSHEY_SIMPLEX,
-						0.8,
-						(215, 5, 247),
-						2,
-						lineType=cv2.LINE_AA
-					)
+			cv2.imshow('frame', frame)
 
-				result.write(frame)
+			# Riproduci l'audio
+			get_audio_frame(player)
 
-				cv2.imshow('frame', frame)
-
-				# Riproduci l'audio
-				get_audio_frame(player)
-
-				if cv2.waitKey(1) & 0xFF == ord('q'):
-					break
-			else:
+			if cv2.waitKey(1) & 0xFF == ord('q'):
 				break
+		else:
+			break
 
-		cap.release()
-		result.release()
-		csv_file.close()
-		cv2.destroyAllWindows()
+	cap.release()
+	result.release()
+	csv_file.close()
+	cv2.destroyAllWindows()
 
 if __name__ == "__main__":
 	titoli = leggi_titoli_video()
-	FER_live_cam(titoli)
+
+	for titolo in titoli:
+		p1 = multiprocessing.Process(target=FER_live_cam, args=(titolo,))
+		p2 = multiprocessing.Process(target=transcribe_audio, args=(titolo,))
+
+		# Avvio dei processi
+		p1.start()
+		p2.start()
+
+		# Attendere il completamento dei processi
+		p1.join()
+		p2.join()

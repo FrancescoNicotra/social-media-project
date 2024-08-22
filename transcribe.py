@@ -3,13 +3,12 @@ import pandas as pd
 
 
 
-def transcribe_audio(audio_path: str, csv_path: str) -> None:
+def transcribe_audio(audio_title: str) -> None:
 	model = whisper.load_model("base")
-	# Carica l'audio completo
-	audio = whisper.load_audio(audio_path)
-
-	# Calcola la durata in secondi
-	duration = len(audio) / whisper.audio.SAMPLE_RATE
+	complete_path = './audio/' + audio_title + '.wav'
+	csv_path = './transcriptions/' + audio_title + '.csv'
+# Carica l'audio completo
+	audio = whisper.load_audio(complete_path)
 
 	# Imposta una finestra di 30 secondi (circa 30 * 16000 campioni)
 	segment_length = 30 * whisper.audio.SAMPLE_RATE

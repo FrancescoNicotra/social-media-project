@@ -5,7 +5,6 @@ from googleExample import youtube_search
 import os
 from extract_audio import extract_audio
 from readVideosTitle import leggi_titoli_video
-from trans import transcribe_audio
 
 # Dove salvare
 SAVE_PATH = os.path.expanduser("~/Desktop/Facial-Emotion-Recognition\ base")
@@ -29,12 +28,19 @@ def download_youtube_video(url, save_path='.'):
 	except Exception as e:
 		print(f"Errore durante il download: {e}")
 
-# Esempio di utilizzo
 if __name__ == "__main__":
+	# Create an argument parser
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--q', help='Search term', default='Google')
-	parser.add_argument('--max-results', help='Max results', default=5)
-	args = parser.parse_args()
+	parser.add_argument('--max-results', help='Max results', default=5, type=int)
+
+	# Instead of parsing command line arguments, set them in a dictionary
+	args_dict = {'q': 'Chris Evans interview', 'max_results': 5}  # Replace with your desired values
+	args = parser.parse_args(args=[])  # Initialize args
+	args.__dict__.update(args_dict)  # Update args with your values
+	os.makedirs('./videos', exist_ok=True)
+	os.makedirs('./audio', exist_ok=True)
+	os.makedirs('./transcriptions', exist_ok=True)
 
 	videoIds = youtube_search(args)
 	print(f"Video IDs: {videoIds}")
@@ -50,5 +56,3 @@ if __name__ == "__main__":
 
 	for video_title in video_titles:
 		extract_audio('./videos/' + video_title.replace(' ', '_') + '.mp4', './audio/' + video_title + '.wav')
-	for video_title in video_titles:
-		transcribe_audio('./audio/' + video_title + '.wav', './transcriptions/' + video_title + '.csv')
