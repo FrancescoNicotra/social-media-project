@@ -1,4 +1,4 @@
-import argparse
+import json
 import os
 
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ YOUTUBE_API_VERSION = 'v3'
 
 def youtube_search(options = None):
 	youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-    developerKey=DEVELOPER_KEY)
+	developerKey=DEVELOPER_KEY)
 
 	# Call the search.list method to retrieve results matching the specified
 	# query term.
@@ -33,14 +33,30 @@ def youtube_search(options = None):
 			videos.append('%s' % search_result['id']['videoId'])
 	return videos
 
-
-if __name__ == '__main__':
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--q', help='Search term', default='Google')
-	parser.add_argument('--max-results', help='Max results', default=25)
-	args = parser.parse_args()
-
+def extract_comments(video_id):
+	youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
+	developerKey=DEVELOPER_KEY)
+	comment_item = {}
 	try:
-		youtube_search(args)
+		request = youtube.commentThreads().list(
+			part="snippet",
+			videoId=video_id,
+			maxResults=100
+		)
+		response = request.execute()
+		for comment_thread in response.get('items', []):
+			comment = comment_thread['snippet']['topLevelComment']['snippet']
+			comment_item = {
+				'videoId': video_id,
+				'created_at': comment['publishedAt'],
+				'comment': comment['textDisplay']
+			}
 	except HttpError as e:
-		print('An HTTP error %d occurred:\n%s' % (e.resp.status, e.content))
+		error_message = json.loads(e.content)['error']['message']
+		if 'disabled comments' in error_message:
+			print(
+				f"I commenti sono disabilitati per il video con ID '{video_id}'.")
+		else:
+			print(
+				f"Errore durante il recupero dei commenti per il video con ID '{video_id}':", error_message)
+	return comment_item

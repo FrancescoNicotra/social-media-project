@@ -13,3 +13,4 @@ transcriptions/*
 .ipynb_checkpoints/
 
 *.csv
+*.avi
