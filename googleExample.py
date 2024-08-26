@@ -34,29 +34,32 @@ def youtube_search(options = None):
 	return videos
 
 def extract_comments(video_id):
-	youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-	developerKey=DEVELOPER_KEY)
-	comment_item = {}
-	try:
-		request = youtube.commentThreads().list(
-			part="snippet",
-			videoId=video_id,
-			maxResults=100
-		)
-		response = request.execute()
-		for comment_thread in response.get('items', []):
-			comment = comment_thread['snippet']['topLevelComment']['snippet']
-			comment_item = {
-				'videoId': video_id,
-				'created_at': comment['publishedAt'],
-				'comment': comment['textDisplay']
-			}
-	except HttpError as e:
-		error_message = json.loads(e.content)['error']['message']
-		if 'disabled comments' in error_message:
-			print(
-				f"I commenti sono disabilitati per il video con ID '{video_id}'.")
-		else:
-			print(
-				f"Errore durante il recupero dei commenti per il video con ID '{video_id}':", error_message)
-	return comment_item
+    youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
+                    developerKey=DEVELOPER_KEY)
+    results = youtube.commentThreads().list(
+        part="snippet",
+        videoId=video_id,
+        textFormat="plainText"
+    ).execute()
+
+    # Lista per contenere i commenti del video corrente
+    video_comments = []
+
+    for item in results["items"]:
+        comment = item["snippet"]["topLevelComment"]
+        author = comment["snippet"]["authorDisplayName"]
+        text = comment["snippet"]["textDisplay"]
+
+        # Aggiungi il commento alla lista dei commenti
+        video_comments.append({
+            "author": author,
+            "text": text
+        })
+
+    # Ritorna un dizionario con l'ID del video e i suoi commenti
+    return {
+        "video_id": video_id,
+        "comments": video_comments
+    }
+
+comments_json = []
