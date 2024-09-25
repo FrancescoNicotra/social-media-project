@@ -9,13 +9,11 @@ import numpy as np
 import time
 import csv
 import pandas as pd
-import multiprocessing
+import os
 
 from ffpyplayer.player import MediaPlayer
-from readVideosTitle import leggi_titoli_video
 from cv2 import dnn
 from math import ceil
-from transcribe import transcribe_audio
 
 image_mean = np.array([127, 127, 127])
 image_std = 128.0
@@ -212,10 +210,23 @@ def FER_live_cam(video_name: str):
 
 	# Open CSV file for appending
 	df = pd.DataFrame(columns=['Emotion', 'Timestamp'])
+	os.makedirs('./emotions/', exist_ok=True)
 	csv_file_title = 'emotions_' + video_name.replace(' ', '_') + '.csv'
-	df.to_csv(csv_file_title, index=False)
-	csv_file = open(csv_file_title, mode='a', newline='')
+
+	# Crea il file CSV all'interno della cartella ./emotions/
+	df.to_csv('./emotions/' + csv_file_title, index=False)
+
+	csv_file = open('./emotions/' + csv_file_title, mode='a', newline='')
 	csv_writer = csv.writer(csv_file)
+
+
+	# before starting the loop, check if the video has already been processed
+	# if so, skip the processing
+	if os.path.exists('./emotions/' + csv_file_title):
+		df = pd.read_csv('./emotions/' + csv_file_title)
+		if not df.empty:
+			print("Video already processed")
+			return
 
 	while cap.isOpened():
 		ret, frame = cap.read()
@@ -297,18 +308,3 @@ def FER_live_cam(video_name: str):
 	result.release()
 	csv_file.close()
 	cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-	titoli = leggi_titoli_video()
-
-	for titolo in titoli:
-		p1 = multiprocessing.Process(target=FER_live_cam, args=(titolo,))
-		p2 = multiprocessing.Process(target=transcribe_audio, args=(titolo,))
-
-		# Avvio dei processi
-		p1.start()
-		p2.start()
-
-		# Attendere il completamento dei processi
-		p1.join()
-		p2.join()

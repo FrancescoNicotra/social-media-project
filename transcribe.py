@@ -1,9 +1,15 @@
 import whisper
 import pandas as pd
+import os
 
 
 
 def transcribe_audio(audio_title: str) -> None:
+	# check if the audio has already been transcribed
+	if os.path.exists('./transcriptions/' + audio_title + '.csv'):
+		print("Audio already transcribed")
+		return
+
 	model = whisper.load_model("base")
 	complete_path = './audio/' + audio_title + '.wav'
 	csv_path = './transcriptions/' + audio_title + '.csv'

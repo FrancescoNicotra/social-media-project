@@ -1,6 +1,6 @@
 import os
 
-def leggi_titoli_video(directory='./videos') -> list[str]:
+def read_videos_title(directory='./videos') -> list[str]:
     # Verifica che la cartella esista
     if not os.path.exists(directory):
         raise FileNotFoundError(f"La cartella {directory} non esiste.")

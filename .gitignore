@@ -15,3 +15,9 @@ transcriptions/*
 *.csv
 *.avi
 comments.json
+
+responses/*
+summaries/*
+clips_cut/*
+comments_sentiments/*
+gentle/*
