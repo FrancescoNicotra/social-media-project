@@ -1,0 +1,9 @@
+opencv-python	# Per il modulo cv2
+numpy			# Per il modulo numpy
+pandas			# Per il modulo pandas
+ffpyplayer		# Per il modulo ffpyplayer.player
+pytubefix		# Per il modulo pytubefix
+google-api-python-client	# Per il modulo googleExample (esempio di youtube_search)
+moviepy 		# Per il modulo moviepy.editor
+nltk		# Per il modulo nltk
+python-dotenv	# Per il modulo dotenv

@@ -4,7 +4,7 @@ from pytubefix.cli import on_progress
 from googleExample import youtube_search
 import os
 from extract_audio import extract_audio
-from readVideosTitle import leggi_titoli_video
+from readVideosTitle import read_videos_title
 
 # Dove salvare
 SAVE_PATH = os.path.expanduser("~/Desktop/Facial-Emotion-Recognition\ base")
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 	# Scarica i video dalla lista
 	for link in links:
 		download_youtube_video(link, SAVE_PATH)
-	video_titles = leggi_titoli_video()
+	video_titles = read_videos_title()
 
 	for video_title in video_titles:
 		extract_audio('./videos/' + video_title.replace(' ', '_') + '.mp4', './audio/' + video_title + '.wav')
