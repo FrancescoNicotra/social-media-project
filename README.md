@@ -1,4 +1,4 @@
-# Jupyter Notebook Project with Docker
+# Social media project
 
 This repository contains a project developed using Jupyter Notebook. The environment is set up with all necessary dependencies using Docker and a `requirements.txt` file. Follow the steps below to get the project up and running.
 
